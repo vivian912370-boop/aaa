@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>손바느질 스트링파우치 시뮬레이션</title>
+<style>
+  :root { --bg:#fdf8f3; --card:#fff; --ink:#3a2f28; --sub:#8a7b70; --accent:#e07a5f; --ok:#5f9e7f; --err:#c0392b; --line:#eadfd5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:720px; margin:0 auto; padding:20px 14px 50px; }
+  header { text-align:center; margin-bottom:14px; }
+  header h1 { margin:4px 0; font-size:1.5rem; }
+  header p { margin:0; color:var(--sub); font-size:.95rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:14px; }
+  details summary { cursor:pointer; font-weight:700; }
+  .mats { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .mats label { display:flex; align-items:center; gap:6px; padding:5px 11px; border:1px solid var(--line); border-radius:20px; cursor:pointer; font-size:.92rem; }
+  .mats input:checked + span { text-decoration:line-through; color:var(--sub); }
+  .safety { margin:10px 0 0; padding-left:18px; color:var(--sub); font-size:.9rem; line-height:1.7; }
+
+  .stepper { display:flex; gap:4px; margin-bottom:12px; }
+  .stepper button { flex:1; height:30px; border:0; border-radius:8px; background:var(--line); color:var(--sub); font-weight:700; cursor:pointer; font-family:inherit; }
+  .stepper button.done { background:#cfe6da; color:var(--ok); }
+  .stepper button.now { background:var(--accent); color:#fff; }
+  .stats { display:flex; justify-content:space-between; color:var(--sub); font-size:.9rem; margin-bottom:6px; }
+
+  h2 { margin:0 0 6px; font-size:1.2rem; }
+  .desc { margin:0 0 6px; line-height:1.6; }
+  .tip { background:#fff6e8; border-radius:10px; padding:8px 12px; font-size:.9rem; color:#7a5a2f; line-height:1.6; margin-bottom:10px; }
+  .stage-wrap { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fffaf5; }
+  svg { display:block; width:100%; height:auto; user-select:none; }
+  .hit { cursor:pointer; }
+  .pulse { animation:pulse 1s infinite; pointer-events:none; }
+  @keyframes pulse { 50% { opacity:.15; } }
+  .shake { animation:shake .35s; }
+  @keyframes shake { 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+  .flip { animation:flip .8s; }
+  @keyframes flip { 50% { transform:scaleX(0); } }
+
+  .status { display:flex; justify-content:space-between; flex-wrap:wrap; gap:6px; font-size:.9rem; color:var(--sub); margin:8px 2px 0; }
+  .msg { min-height:44px; margin:10px 0; padding:10px 12px; border-radius:10px; background:var(--bg); line-height:1.5; }
+  .msg.ok { background:#e6f3ec; color:var(--ok); }
+  .msg.err { background:#fbe9e7; color:var(--err); }
+  .controls { display:flex; flex-wrap:wrap; gap:8px; }
+  button.act { border:0; border-radius:10px; padding:10px 14px; font-size:.95rem; cursor:pointer; background:#f3e3d8; color:var(--ink); font-family:inherit; }
+  button.act:hover { background:#ecd3c3; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--sub); }
+  .nav { display:flex; justify-content:flex-end; margin-top:12px; }
+  #nextBtn { border:0; border-radius:10px; padding:11px 20px; font-size:1rem; background:var(--accent); color:#fff; cursor:pointer; font-family:inherit; }
+  #nextBtn:disabled { background:var(--line); color:var(--sub); cursor:default; }
+  .summary { text-align:center; width:100%; padding:10px; line-height:1.9; }
+  .summary .stars { font-size:2rem; color:#f2b134; }
+  .legend { font-size:.85rem; color:var(--sub); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div style="font-size:2.2rem">🪡👜</div>
+    <h1>손바느질 스트링파우치 시뮬레이션</h1>
+    <p>진짜 바느질 전에 화면에서 순서와 땀 뜨는 법을 미리 연습해요</p>
+  </header>
+
+  <div class="card">
+    <details>
+      <summary>🧺 준비물 & 안전 수칙</summary>
+      <div class="mats" id="mats"></div>
+      <ul class="safety">
+        <li>바늘은 쓰지 않을 때 항상 <b>바늘꽂이</b>에 꽂아 두어요.</li>
+        <li>바늘 끝이 <b>몸 바깥쪽</b>을 향하게 잡고, 친구 쪽으로 휘두르지 않아요.</li>
+        <li>시침핀은 바느질하면서 하나씩 빼서 바로 정리해요.</li>
+        <li>가위는 손잡이 쪽으로 건네요.</li>
+      </ul>
+    </details>
+  </div>
+
+  <div class="stepper" id="stepper"></div>
+  <div class="stats"><span id="stageNo"></span><span>⏱ <span id="clock">00:00</span> · ❌ 실수 <span id="mistakes">0</span></span></div>
+
+  <div class="card">
+    <h2 id="title"></h2>
+    <p class="desc" id="desc"></p>
+    <div class="tip" id="tip"></div>
+    <div class="stage-wrap" id="wrap">
+      <svg id="stage" viewBox="0 0 400 300"></svg>
+    </div>
+    <div class="status" id="status"></div>
+    <div class="msg" id="msg"></div>
+    <div class="controls" id="controls"></div>
+    <div class="nav"><button id="nextBtn" disabled>다음 단계 ▶</button></div>
+  </div>
+</main>
+
+<script>
+/* ---------- 공통 ---------- */
+const $ = id => document.getElementById(id);
+const svg = $('stage'), wrap = $('wrap');
+const BG = '#fffaf5', THREAD = '#c0392b';
+const DEFS = `<defs>
+  <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f4c9b8"/><circle cx="4" cy="4" r="2.2" fill="#fff" opacity=".8"/><circle cx="12" cy="12" r="2.2" fill="#fff" opacity=".8"/></pattern>
+  <pattern id="wrong" width="16" height="16" patternUnits="userSpaceOnUse"><rect width="16" height="16" fill="#f6e4dc"/><circle cx="4" cy="4" r="2" fill="#fff" opacity=".5"/><circle cx="12" cy="12" r="2" fill="#fff" opacity=".5"/></pattern>
+</defs>`;
+const S = { stage:0, mistakes:0, start:Date.now(), skipped:0, onAct:null, done:new Set() };
+
+const setSVG = html => { svg.innerHTML = DEFS + `<rect width="400" height="300" fill="${BG}"/>` + html; };
+svg.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (el && S.onAct) S.onAct(el.dataset.act);
+});
+function msg(text, kind = '') { const m = $('msg'); m.className = 'msg ' + kind; m.innerHTML = text; }
+function status(html) { $('status').innerHTML = html || ''; }
+function mistake(text) {
+  S.mistakes++; $('mistakes').textContent = S.mistakes;
+  msg('❌ ' + text, 'err');
+  wrap.classList.remove('shake'); void wrap.offsetWidth; wrap.classList.add('shake');
+}
+function complete(text) {
+  msg('✅ ' + text, 'ok');
+  S.done.add(S.stage); renderStepper();
+  $('nextBtn').disabled = false;
+  if (S.stage === STAGES.length - 1) showSummary();
+}
+function controls(list) {
+  const c = $('controls'); c.innerHTML = '';
+  list.forEach(([label, fn, cls]) => {
+    const b = document.createElement('button');
+    b.className = 'act ' + (cls || ''); b.innerHTML = label; b.onclick = fn; c.appendChild(b);
+  });
+}
+const shuffle = a => a.map(v => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map(v => v[1]);
+
+/* 선을 따라 일정 간격으로 바늘 구멍 만들기 */
+function polyHoles(pts, spacing) {
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1], [bx, by] = pts[i];
+    const k = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / spacing));
+    for (let j = 1; j <= k; j++) out.push([ax + (bx - ax) * j / k, ay + (by - ay) * j / k]);
+  }
+  return out;
+}
+const U_PTS = [[80, 120], [80, 260], [320, 260], [320, 120]];
+const SEAM_HOLES = polyHoles(U_PTS, 35);                 // 16개
+const CHANNEL_HOLES = polyHoles([[72, 104], [328, 104]], 23); // 12개
+const ptsStr = p => p.map(q => q.join(',')).join(' ');
+
+/* ---------- 그림 조각 ---------- */
+function fabricInner(top = 30) {
+  const h = 280 - top;
+  return `<rect x="66" y="${top + 5}" width="280" height="${h}" fill="url(#dots)"/>
+          <rect x="60" y="${top}" width="280" height="${h}" fill="url(#wrong)" stroke="#dcbcab"/>`;
+}
+function foldBands(f) {
+  let s = '';
+  if (f === 1) s += `<rect x="60" y="42" width="280" height="10" fill="rgba(0,0,0,.07)"/><line x1="60" y1="52" x2="340" y2="52" stroke="#b08a78" stroke-dasharray="4 3"/>`;
+  if (f === 2) s += `<rect x="60" y="70" width="280" height="40" fill="rgba(0,0,0,.07)"/>
+    <line x1="60" y1="80" x2="340" y2="80" stroke="#b08a78" stroke-dasharray="4 3"/>
+    <line x1="60" y1="110" x2="340" y2="110" stroke="#b08a78" stroke-dasharray="4 3"/>
+    <text x="345" y="94" font-size="10" fill="#8a7b70">끈</text><text x="345" y="106" font-size="10" fill="#8a7b70">통로</text>`;
+  return s;
+}
+const seamDone = () => `<polyline points="${ptsStr(U_PTS)}" fill="none" stroke="${THREAD}" stroke-width="2.5"/>`;
+const channelDone = () => `<line x1="72" y1="104" x2="328" y2="104" stroke="${THREAD}" stroke-width="2.5" stroke-dasharray="23 23"/>`;
+
+function pouchPath(g) {
+  return `M${60 + g} 70 L${340 - g} 70 C ${340 - g * .3} 110, 340 140, 340 180 L340 280 L60 280 L60 180 C 60 140, ${60 + g * .3} 110, ${60 + g} 70 Z`;
+}
+function fabricOuter(g = 0) {
+  const p = pouchPath(g);
+  let folds = '';
+  if (g > 0) for (let i = 1; i < 10; i++) {
+    const x = 60 + g + (280 - 2 * g) * i / 10;
+    folds += `<line x1="${x}" y1="70" x2="${x + (x - 200) * .08}" y2="${110 + g * .3}" stroke="rgba(0,0,0,.12)" stroke-width="2"/>`;
+  }
+  return `<clipPath id="pc"><path d="${p}"/></clipPath>
+    <path d="${p}" fill="url(#dots)" stroke="#dcbcab"/>
+    <g clip-path="url(#pc)">
+      <rect x="0" y="70" width="400" height="40" fill="rgba(0,0,0,.05)"/>
+      <line x1="0" y1="110" x2="400" y2="110" stroke="#c9a493"/>
+      <line x1="72" y1="104" x2="328" y2="104" stroke="${THREAD}" stroke-width="2.5" stroke-dasharray="23 23"/>
+      ${folds}
+    </g>`;
+}
+
+/* ---------- 땀 뜨기 엔진 (홈질 / 박음질) ---------- */
+function stitcher({ holes, type, base, onDone }) {
+  const n = type === 'running' ? holes.length - holes.length % 2 : holes.length;
+  const seq = [];
+  if (type === 'running') for (let i = 0; i < n; i++) seq.push({ h: i, dir: i % 2 ? 'down' : 'up' });
+  else {
+    seq.push({ h: 1, dir: 'up' }, { h: 0, dir: 'down' });
+    for (let i = 2; i < n; i++) seq.push({ h: i, dir: 'up' }, { h: i - 1, dir: 'down' });
+  }
+  let pos = 0, hint = true, flash = false;
+  const lines = [];
+
+  function advance() {
+    if (pos > 0) { const prev = seq[pos - 1]; lines.push({ a: prev.h, b: seq[pos].h, front: prev.dir === 'up' }); }
+    pos++;
+  }
+  function draw() {
+    let s = base();
+    lines.filter(l => !l.front).forEach(l => {
+      const [a, b] = [holes[l.a], holes[l.b]];
+      s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${THREAD}" stroke-width="1.5" stroke-dasharray="3 3" opacity=".45"/>`;
+    });
+    lines.filter(l => l.front).forEach(l => {
+      const [a, b] = [holes[l.a], holes[l.b]];
+      s += `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${THREAD}" stroke-width="3" stroke-linecap="round"/>`;
+    });
+    holes.slice(0, n).forEach(([x, y]) => { s += `<circle cx="${x}" cy="${y}" r="3" fill="#fff" stroke="#b08a78"/>`; });
+    if (pos < seq.length && (hint || flash)) {
+      const [x, y] = holes[seq[pos].h];
+      s += `<circle cx="${x}" cy="${y}" r="10" fill="none" stroke="#e07a5f" stroke-width="3" class="pulse"/>`;
+    }
+    if (pos > 0) {
+      const [x, y] = holes[seq[pos - 1].h];
+      s += `<text x="${x + 6}" y="${y - 6}" font-size="16" pointer-events="none">🪡</text>`;
+    }
+    holes.slice(0, n).forEach(([x, y], i) => { s += `<circle data-act="h-${i}" class="hit" cx="${x}" cy="${y}" r="11" fill="transparent"/>`; });
+    s += `<text x="12" y="292" font-size="11" fill="#8a7b70">━ 앞면에 보이는 땀   ┅ 뒷면에 숨은 땀</text>`;
+    setSVG(s);
+    flash = false;
+    const side = pos === 0 ? '뒷면 (매듭은 뒤에!)' : (seq[pos - 1].dir === 'up' ? '앞면' : '뒷면');
+    const next = pos >= seq.length ? '완료' :
+      seq[pos].dir === 'up' ? '⬆️ 뒤에서 앞으로 올리기' :
+      (type === 'back' ? '⬇️ 한 땀 <b>뒤로 돌아가</b> 꽂기' : '⬇️ 앞에서 뒤로 꽂기');
+    const fronts = lines.filter(l => l.front).length, total = type === 'back' ? n - 1 : n / 2;
+    status(`<span>바늘 위치: <b>${side}</b> · 다음: ${next}</span><span>앞면 땀 ${fronts} / ${total}</span>`);
+  }
+  S.onAct = act => {
+    if (!act.startsWith('h-') || pos >= seq.length) return;
+    const k = +act.slice(2), exp = seq[pos];
+    if (k === exp.h) {
+      advance();
+      if (pos >= seq.length) { draw(); onDone(); return; }
+      msg(exp.dir === 'up' ? '좋아요! 실을 끝까지 당겨 주세요.' : '좋아요! 한 땀 완성 👍');
+    } else {
+      flash = true;
+      if (type === 'back' && exp.dir === 'down' && k > seq[pos - 1].h)
+        mistake('박음질은 앞으로 가지 않고, <b>한 땀 뒤로 돌아가서</b> 꽂아요!');
+      else if (type === 'running' && Math.abs(k - (pos ? seq[pos - 1].h : 0)) > 1)
+        mistake('구멍을 건너뛰었어요. 바로 다음 구멍에 바늘을 넣어요.');
+      else mistake('그 구멍이 아니에요. 반짝이는 구멍을 확인해 보세요.');
+    }
+    draw();
+  };
+  controls([
+    ['💡 힌트 켜기/끄기', () => { hint = !hint; msg(hint ? '힌트를 켰어요.' : '힌트를 껐어요. 스스로 도전!'); draw(); }, 'ghost'],
+    ['⏩ 나머지 자동으로 꿰매기', () => {
+      if (pos >= seq.length) return;
+      S.skipped++; while (pos < seq.length) advance(); draw(); onDone();
+    }, 'ghost'],
+  ]);
+  draw();
+}
+
+/* ---------- 단계 ---------- */
+const STAGES = [
+{
+  title: '실 꿰고 시작 매듭 짓기',
+  desc: '바늘에 실을 꿰고, 실 끝에 매듭을 지어요.',
+  tip: '실은 <b>팔 길이(50~60cm)</b> 정도가 좋아요. 너무 길면 엉키고, 너무 짧으면 자주 다시 꿰어야 해요.',
+  init() {
+    let ph = 0, wraps = 0;
+    const draw = () => {
+      let s = `<g data-act="body" class="hit"><line x1="200" y1="45" x2="200" y2="262" stroke="#9aa3ad" stroke-width="8" stroke-linecap="round"/>
+        <polygon points="196,262 204,262 200,284" fill="#9aa3ad"/></g>
+        <ellipse cx="200" cy="66" rx="2.5" ry="11" fill="${BG}" pointer-events="none"/>
+        <text x="215" y="70" font-size="12" fill="#8a7b70">← 바늘귀</text>`;
+      if (ph === 0) s += `<circle cx="200" cy="66" r="20" fill="none" stroke="#e07a5f" stroke-width="3" class="pulse"/>
+        <ellipse data-act="eye" class="hit" cx="200" cy="66" rx="16" ry="22" fill="transparent"/>`;
+      if (ph >= 1) s += `<path d="M200 66 C 250 30, 310 110, 270 190 S 300 250, 330 262" stroke="${THREAD}" stroke-width="2.5" fill="none"/>
+        <path d="M200 66 C 175 80, 160 100, 168 128" stroke="${THREAD}" stroke-width="2.5" fill="none"/>`;
+      for (let i = 0; i < wraps && ph < 3; i++) s += `<ellipse cx="330" cy="262" rx="${8 + i * 3}" ry="${5 + i * 2}" fill="none" stroke="${THREAD}" stroke-width="2"/>`;
+      if (ph >= 3) s += `<circle cx="330" cy="262" r="8" fill="${THREAD}"/><text x="300" y="290" font-size="12" fill="#8a7b70">매듭 완성!</text>`;
+      setSVG(s);
+    };
+    const quiz = () => {
+      msg('실 길이는 얼마가 알맞을까요?');
+      controls(shuffle([
+        ['20cm', () => mistake('너무 짧아요. 몇 땀 못 가서 실이 모자라요.')],
+        ['50~60cm (팔 길이 정도)', () => { ph = 2; draw(); knotStep(); }],
+        ['2m', () => mistake('너무 길면 실이 엉키고 꼬여요.')],
+      ]));
+    };
+    const knotStep = () => {
+      msg('정답! 이제 실 끝을 <b>검지에 2~3번 감고</b>, 엄지로 비벼 빼서 매듭을 만들어요.');
+      controls([
+        ['👆 검지에 실 감기', () => { if (wraps < 3) wraps++; msg(`실을 ${wraps}번 감았어요.`); draw(); }],
+        ['✊ 비벼서 매듭 빼기', () => {
+          if (wraps < 2) return mistake('2번 이상 감아야 매듭이 빠지지 않아요.');
+          ph = 3; draw(); controls([]); complete('시작 매듭 완성! 매듭이 천 뒷면에 오게 꿰매기 시작해요.');
+        }],
+      ]);
+    };
+    S.onAct = a => {
+      if (ph !== 0) return;
+      if (a === 'eye') { ph = 1; draw(); quiz(); }
+      else mistake('바늘귀는 바늘 위쪽의 작은 구멍이에요.');
+    };
+    msg('바늘귀(반짝이는 곳)를 눌러 실을 꿰어 보세요.');
+    draw();
+  }
+},
+{
+  title: '원단 재단하기',
+  desc: '초크로 그린 선을 따라 네 변을 잘라요. (선을 클릭)',
+  tip: '완성 크기 15×20cm 파우치 → 시접을 더해 <b>17 × 24cm</b> 원단 2장이 필요해요.',
+  init() {
+    const cut = { top: 0, right: 0, bottom: 0, left: 0 };
+    const edges = { top: [60, 30, 340, 30], right: [340, 30, 340, 280], bottom: [60, 280, 340, 280], left: [60, 30, 60, 280] };
+    const cover = { top: [0, 0, 400, 30], bottom: [0, 280, 400, 20], left: [0, 0, 60, 300], right: [340, 0, 60, 300] };
+    const draw = () => {
+      let s = `<rect x="18" y="8" width="364" height="288" fill="url(#dots)"/>`;
+      for (const k in cut) if (cut[k]) { const [x, y, w, h] = cover[k]; s += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${BG}"/>`; }
+      for (const k in edges) {
+        const [x1, y1, x2, y2] = edges[k];
+        s += cut[k] ? `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#dcbcab"/>`
+          : `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#3b6ea5" stroke-width="2" stroke-dasharray="6 4"/>
+             <line data-act="${k}" class="hit" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="20"/>`;
+      }
+      s += `<text x="200" y="150" text-anchor="middle" font-size="16" fill="#7a5a4f" pointer-events="none">17 × 24 cm</text>
+            <text x="200" y="172" text-anchor="middle" font-size="12" fill="#8a7b70" pointer-events="none">✂️ 파란 점선을 눌러 자르기</text>`;
+      setSVG(s);
+    };
+    S.onAct = k => {
+      if (!(k in cut) || cut[k]) return;
+      cut[k] = 1; draw();
+      const left = Object.values(cut).filter(v => !v).length;
+      if (left) msg(`싹둑! ${left}변 남았어요.`);
+      else complete('같은 크기로 한 장 더 자르면 원단 2장 준비 완료!');
+    };
+    controls([]); msg('가위로 선을 따라 똑바로 잘라요.'); draw();
+  }
+},
+{
+  title: '겉끼리 맞대고 시침핀 꽂기',
+  desc: '두 장의 <b>겉면이 안쪽</b>을 보도록 겹치고, 반짝이는 곳에 시침핀을 꽂아요.',
+  tip: '시침핀은 바느질 선과 <b>수직</b>으로, 머리가 바깥쪽에 오게 꽂아요. 꿰매면서 하나씩 빼요.',
+  init() {
+    const spots = [
+      { x: 60, y: 160, d: 'l' }, { x: 60, y: 230, d: 'l' }, { x: 140, y: 280, d: 'b' },
+      { x: 260, y: 280, d: 'b' }, { x: 340, y: 230, d: 'r' }, { x: 340, y: 160, d: 'r' },
+    ];
+    const pinned = spots.map(() => false);
+    const pin = ({ x, y, d }) => {
+      const [hx, hy, tx, ty] = d === 'l' ? [x - 22, y, x + 30, y] : d === 'r' ? [x + 22, y, x - 30, y] : [x, y + 16, x, y - 32];
+      return `<line x1="${hx}" y1="${hy}" x2="${tx}" y2="${ty}" stroke="#777" stroke-width="2"/><circle cx="${hx}" cy="${hy}" r="5" fill="#e07a5f"/>`;
+    };
+    const draw = () => {
+      let s = fabricInner(30) + `<text x="200" y="150" text-anchor="middle" font-size="12" fill="#8a7b70" pointer-events="none">안쪽(뒷면)이 보이게 겹친 상태</text>`;
+      spots.forEach((p, i) => {
+        s += pinned[i] ? pin(p) : `<circle cx="${p.x}" cy="${p.y}" r="12" fill="none" stroke="#e07a5f" stroke-width="3" class="pulse"/>
+          <circle data-act="p-${i}" class="hit" cx="${p.x}" cy="${p.y}" r="14" fill="transparent"/>`;
+      });
+      setSVG(s);
+    };
+    S.onAct = a => {
+      const i = +a.slice(2);
+      if (pinned[i]) return;
+      pinned[i] = true; draw();
+      const left = pinned.filter(v => !v).length;
+      if (left) msg(`핀 고정! ${left}개 남았어요.`);
+      else complete('두 장이 움직이지 않게 잘 고정했어요.');
+    };
+    controls([]); msg('반짝이는 동그라미를 눌러 핀을 꽂아요.'); draw();
+  }
+},
+{
+  title: '옆선·밑선 박음질',
+  desc: '<b>박음질</b>로 ㄷ자 모양으로 꿰매요. 위쪽 끈 통로 자리는 남겨 둬요.',
+  tip: '박음질: 한 땀 <b>앞으로</b> 나와서 → <b>뒤로</b> 한 땀 돌아가 꽂기. 앞면은 재봉틀처럼 이어진 선이 되어 튼튼해요.',
+  init() {
+    const base = () => fabricInner(30) +
+      `<rect x="60" y="30" width="280" height="80" fill="rgba(255,255,255,.35)"/>
+       <text x="200" y="76" text-anchor="middle" font-size="12" fill="#8a7b70">트임 + 끈 통로 자리 (꿰매지 않아요)</text>
+       <polyline points="${ptsStr(U_PTS)}" fill="none" stroke="#3b6ea5" stroke-dasharray="5 4"/>
+       <text x="88" y="116" font-size="11" fill="#3b6ea5">시작 ↓</text>`;
+    msg('먼저 2번 구멍에서 바늘을 앞으로 올리고, 1번 구멍으로 돌아가 꽂아요. 반짝이는 구멍을 따라가 보세요.');
+    stitcher({ holes: SEAM_HOLES, type: 'back', base, onDone: () => complete('박음질 완성! 마지막에 매듭을 짓고 실을 잘라요.') });
+  }
+},
+{
+  title: '끈 통로 접기',
+  desc: '입구를 두 번 접어 끈이 지나갈 통로를 만들어요. 순서에 맞는 버튼을 눌러요.',
+  tip: '처음에 1cm를 접으면 원단 끝이 숨어서 <b>올이 풀리지 않아요</b>. 접을 때마다 다리미로 눌러 주면 손바느질이 쉬워져요.',
+  init() {
+    let f = 0;
+    const draw = () => setSVG(fabricInner(f === 0 ? 30 : f === 1 ? 42 : 70) + foldBands(f) + seamDone());
+    const fold1 = () => {
+      if (f !== 0) return msg('이미 1cm를 접었어요.');
+      f = 1; draw(); msg('1cm 접기 완료! 다음 접기를 골라요.');
+    };
+    const fold2 = () => {
+      if (f === 0) return mistake('먼저 1cm를 접어야 원단 끝이 숨어 올이 풀리지 않아요.');
+      if (f === 2) return;
+      f = 2; draw(); controls([]); complete('끈 통로가 생겼어요. 이제 아래쪽 접은 선을 꿰매요.');
+    };
+    controls(shuffle([['📐 2cm 한 번 더 접기', fold2], ['📐 1cm 접기', fold1]]));
+    S.onAct = null; msg('어떤 것부터 접어야 할까요?'); draw();
+  }
+},
+{
+  title: '끈 통로 홈질',
+  desc: '접은 부분의 아래쪽을 <b>홈질</b>로 꿰매 고정해요.',
+  tip: '홈질: 한 땀 올리고, 한 땀 내리고 — 앞뒤로 같은 간격의 점선이 생겨요. 땀 간격을 일정하게 하는 게 포인트!',
+  init() {
+    const base = () => fabricInner(70) + foldBands(2) + seamDone() +
+      `<line x1="72" y1="104" x2="328" y2="104" stroke="#3b6ea5" stroke-dasharray="5 4"/>`;
+    msg('왼쪽 첫 구멍에서 바늘을 앞으로 올리며 시작해요.');
+    stitcher({ holes: CHANNEL_HOLES, type: 'running', base, onDone: () => complete('홈질 완성! 반대편 통로도 같은 방법으로 꿰매요.') });
+  }
+},
+{
+  title: '마무리 매듭 & 뒤집기',
+  desc: '실이 풀리지 않게 마무리 매듭을 짓고, 파우치를 겉으로 뒤집어요.',
+  tip: '마무리 매듭: 마지막 땀 옆에 바늘을 대고 실을 <b>2~3번 감은 뒤</b> 바늘을 뽑아요. 실은 매듭 위 0.5cm 남기고 잘라요.',
+  init() {
+    let ph = 0, wraps = 0;
+    const draw = () => {
+      if (ph >= 4) { setSVG(fabricOuter(0)); return; }
+      let s = fabricInner(70) + foldBands(2) + seamDone() + channelDone();
+      for (let i = 0; i < wraps && ph === 0; i++) s += `<ellipse cx="336" cy="104" rx="${4 + i * 3}" ry="${6 + i * 2}" fill="none" stroke="${THREAD}" stroke-width="2"/>`;
+      if (ph >= 1) s += `<circle cx="336" cy="104" r="5" fill="${THREAD}"/>`;
+      if (ph === 1) s += `<line x1="336" y1="104" x2="370" y2="70" stroke="${THREAD}" stroke-width="2"/>`;
+      s += `<text x="336" y="${ph === 0 ? 200 : 135}" font-size="14" text-anchor="middle">🪡</text>`;
+      setSVG(s);
+    };
+    const order = (need, fn) => () => { if (ph !== need) return mistake(['먼저 실을 감고 매듭을 지어요.', '매듭을 먼저 완성해요.', '실을 먼저 잘라요.', ''][ph] || '순서를 확인해요.'); fn(); };
+    controls([
+      ['🌀 바늘에 실 감기', () => { if (ph !== 0) return; if (wraps < 3) wraps++; msg(`실을 ${wraps}번 감았어요.`); draw(); }],
+      ['✊ 바늘 뽑아 매듭 짓기', () => {
+        if (ph !== 0) return;
+        if (wraps < 2) return mistake('2번 이상 감아야 매듭이 단단해요.');
+        ph = 1; draw(); msg('매듭 완성! 남은 실을 잘라요.');
+      }],
+      ['✂️ 실 자르기', order(1, () => { ph = 2; draw(); msg('깔끔해요! 이제 파우치를 뒤집어요.'); })],
+      ['🔄 겉으로 뒤집기', order(2, () => {
+        ph = 3; wrap.classList.remove('flip'); void wrap.offsetWidth; wrap.classList.add('flip');
+        setTimeout(() => { ph = 4; draw(); controls([]); complete('짠! 예쁜 겉면이 나왔어요. 모서리는 송곳이나 연필로 살살 밀어 빼요.'); }, 400);
+      })],
+    ]);
+    S.onAct = null; msg('버튼을 순서대로 눌러 마무리해요.'); draw();
+  }
+},
+{
+  title: '끈 꿰고 완성!',
+  desc: '옷핀에 끈을 끼워 통로로 밀어 넣어요. 끈 2개를 양쪽에서 한 바퀴씩!',
+  tip: '첫 번째 끈은 <b>왼쪽 트임</b>에서 들어가 한 바퀴 돌아 왼쪽으로, 두 번째 끈은 <b>오른쪽 트임</b>에서 한 바퀴 돌아 오른쪽으로 나와요.',
+  init() {
+    const STEPS = 8; let p1 = 0, p2 = 0, g = 0, tied = false;
+    const cord = (t, color, side) => {
+      const xs = 60 + g * .9, xe = 340 - g * .9, L = side === 'L';
+      const [a, b] = L ? [xs, xe] : [xe, xs];
+      const [yF, yB] = L ? [88, 97] : [82, 101];
+      let s = '', px, py;
+      const tailOut = L ? -26 : 26;
+      s += `<line x1="${a}" y1="${yF}" x2="${a + tailOut}" y2="140" stroke="${color}" stroke-width="3"/>`;
+      if (t <= .5) { px = a + (b - a) * t * 2; py = yF; s += `<line x1="${a}" y1="${yF}" x2="${px}" y2="${yF}" stroke="${color}" stroke-width="3"/>`; }
+      else {
+        px = b + (a - b) * (t - .5) * 2; py = yB;
+        s += `<line x1="${a}" y1="${yF}" x2="${b}" y2="${yF}" stroke="${color}" stroke-width="3"/>
+              <line x1="${b}" y1="${yB}" x2="${px}" y2="${yB}" stroke="${color}" stroke-width="3" stroke-dasharray="5 4" opacity=".6"/>`;
+      }
+      if (t >= 1) {
+        s += `<line x1="${a}" y1="${yB}" x2="${a + tailOut * .7}" y2="150" stroke="${color}" stroke-width="3"/>`;
+        if (tied) s += `<circle cx="${a + tailOut * .85}" cy="146" r="6" fill="${color}"/>`;
+      } else if (t > 0) s += `<text x="${px - 9}" y="${py + 6}" font-size="16">🧷</text>`;
+      return s;
+    };
+    const draw = () => setSVG(fabricOuter(g) +
+      cord(p1 / STEPS, '#3b6ea5', 'L') + cord(p2 / STEPS, '#5f9e7f', 'R') +
+      `<text x="12" y="292" font-size="11" fill="#8a7b70">━ 앞쪽 통로   ┅ 뒤쪽 통로</text>`);
+    const push = () => {
+      if (p1 < STEPS) { p1++; msg(p1 < STEPS ? `파란 끈 ${Math.round(p1 / STEPS * 100)}% — 주름을 밀면서 옷핀을 앞으로!` : '파란 끈 완료! 이제 초록 끈을 오른쪽에서 넣어요.'); }
+      else if (p2 < STEPS) { p2++; msg(p2 < STEPS ? `초록 끈 ${Math.round(p2 / STEPS * 100)}%` : '두 끈 모두 통과! 양쪽 끈을 잡아당겨 봐요.'); }
+      draw();
+    };
+    const pull = () => {
+      if (p2 < STEPS) return mistake('끈 2개를 먼저 모두 꿰어야 해요.');
+      if (g > 0) return;
+      const t0 = performance.now();
+      const anim = now => {
+        g = Math.min(1, (now - t0) / 900) * 85; draw();
+        if (g < 85) requestAnimationFrame(anim);
+        else { tied = true; draw(); controls([]); complete('입구가 오므라들었어요! 끈 끝을 묶으면 스트링파우치 완성 🎉'); }
+      };
+      requestAnimationFrame(anim);
+    };
+    controls([['🧷 옷핀 밀기', push], ['🤲 양쪽 끈 잡아당기기', pull]]);
+    S.onAct = null; msg('파란 끈부터 왼쪽 트임으로 넣어요. 「옷핀 밀기」를 눌러요.'); draw();
+  }
+},
+];
+
+/* ---------- 진행 ---------- */
+function renderStepper() {
+  const st = $('stepper'); st.innerHTML = '';
+  STAGES.forEach((_, i) => {
+    const b = document.createElement('button');
+    b.textContent = i + 1; b.title = STAGES[i].title;
+    b.className = i === S.stage ? 'now' : S.done.has(i) ? 'done' : '';
+    b.onclick = () => load(i);
+    st.appendChild(b);
+  });
+}
+function load(i) {
+  S.stage = i; S.onAct = null;
+  const st = STAGES[i];
+  $('stageNo').textContent = `${i + 1} / ${STAGES.length} 단계`;
+  $('title').textContent = `${i + 1}. ${st.title}`;
+  $('desc').innerHTML = st.desc; $('tip').innerHTML = '💡 ' + st.tip;
+  $('nextBtn').disabled = true; $('nextBtn').style.display = i === STAGES.length - 1 ? 'none' : '';
+  status(''); wrap.classList.remove('flip');
+  renderStepper(); st.init();
+}
+function showSummary() {
+  const sec = Math.floor((Date.now() - S.start) / 1000);
+  const time = `${Math.floor(sec / 60)}분 ${sec % 60}초`;
+  const stars = S.mistakes <= 2 ? 3 : S.mistakes <= 6 ? 2 : 1;
+  const c = $('controls');
+  c.innerHTML = `<div class="summary">
+    <div class="stars">${'★'.repeat(stars)}${'☆'.repeat(3 - stars)}</div>
+    <div><b>시뮬레이션 완료!</b> 걸린 시간 ${time} · 실수 ${S.mistakes}번${S.skipped ? ` · 자동 꿰매기 ${S.skipped}번` : ''}</div>
+    <div style="color:var(--sub)">${stars === 3 ? '진짜 바느질할 준비가 됐어요!' : '헷갈렸던 단계를 한 번 더 연습해 봐요.'}</div>
+  </div>`;
+  const b = document.createElement('button');
+  b.className = 'act'; b.textContent = '🔁 처음부터 다시';
+  b.onclick = () => { S.mistakes = 0; S.skipped = 0; S.start = Date.now(); S.done.clear(); $('mistakes').textContent = 0; load(0); };
+  c.appendChild(b);
+}
+$('nextBtn').onclick = () => { if (S.stage < STAGES.length - 1) load(S.stage + 1); };
+
+setInterval(() => {
+  const sec = Math.floor((Date.now() - S.start) / 1000);
+  $('clock').textContent = `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
+}, 1000);
+
+['겉감 원단 2장 (17×24cm)', '끈 2줄 (50cm)', '손바느질 바늘', '실', '바늘꽂이', '골무', '가위', '시침핀', '초크펜', '옷핀'].forEach(m =>
+  $('mats').insertAdjacentHTML('beforeend', `<label><input type="checkbox"><span>${m}</span></label>`));
+
+load(0);
+</script>
+</body>
+</html>
